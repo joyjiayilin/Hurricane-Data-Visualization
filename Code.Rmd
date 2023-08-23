@@ -1,0 +1,258 @@
+----
+title: "project1-joy-lin"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#A.1)
+
+library(tidyverse)
+library(lubridate)
+library(spData)
+library(gganimate)
+library(gifski)
+
+```
+
+
+
+```{r}
+#A.2)
+
+col_names <- c("SID", "SEASON", "NUMBER", "BASIN", "SUBBASIN", "NAME", 
+               "ISO_TIME", "NATURE", "LAT", "LON", "WMO_WIND", 
+               "WMO_PRES","WMO_AGENCY", "TRACK_TYPE", "DISsT2LAND", 
+               "LANDFALL")
+
+col_types <- c("character", "integer", "integer", "character", 
+               "character", "character", "character", "character", 
+               "double", "double", "integer", "integer", 
+               "character", "character", "integer", "integer")
+
+dat <- read.csv(file = "ibtracs.NA.list.v04r00.csv",
+                colClasses = c(col_types, rep("NULL", 147)),
+                stringsAsFactors = FALSE,
+                skip = 77876,
+                na.strings = "MM"
+                )
+
+colnames(dat) <- col_names
+
+```
+
+
+```{r}
+#A.3)
+
+dat$ISO_TIME = as.POSIXct(dat$ISO_TIME)
+dat$MONTH <- lubridate::month(dat$ISO_TIME)
+
+str(dat, vec.len = 1)
+
+```
+
+
+
+```{r}
+#C1.a) 
+
+dat_c1a <- filter(dat, 
+                  SEASON == 2020
+                 )
+
+tropical_cyclones_2020 <- count(distinct(dat_c1a, SID, NAME), NAME == "NOT_NAMED")
+tropical_cyclones_2020
+
+pre_season <- count(
+                    distinct(
+                            filter(dat_c1a, 
+                                   MONTH < 6,
+                                   SID %in% dat_c1a$SID
+                                  )
+                            , SID)
+                    )
+pre_season
+
+
+#I divided the claim into 2 parts: 1) There are 30 named and 1 unnamed storms in 2020; and 2) 0 of them appears before June in 2020. 
+
+#1), I checked if the numbers of named and unnamed storms were 30 and 1, respectively. I used filter() on the imported csv named dat to get data of storms in 2020, getting filtered  dat_c1a. I then used distinct() on SID in dat_c1a to avoid re-counting the same storms or miscounting different storms with same names, while using distinct() on NAME so that I used count() to divide the storms based on whether their NAME is "NOT_NAMED" and compare the numbers of the two categories. In the first  output tropical_cyclones_2020, the corresponding value of the column n (which means number) to the value FALSE in the column NAME == "NOT_NAMED" (which means named storms) is 30, while the corresponding value to TRUE (which means unnamed storms) is 1. The 2020 Atlantic hurricane season featured 30 named and 1 unnamed storms, so the first part of the claim is true.
+
+#2), I checked if the number of the 2020 storms that appeared before June in 2020 was 0. I used filter() on dat to get data of the storms that are before June in 2020, using their SID instead of NAME to avoid re-counting the same storms or miscounting different storms with same names. I then used distinct() and count() to get the number of same storms in 2020. In the second  output pre_season, the value in column n is 2, indicating 2 of the 31 storms that the 2020 Atlantic hurricane season featured formed pre-season, so the second part of the claim is false. Therefore, claim C1.a) is false. 
+
+```
+
+
+
+```{r}
+#C1.b) 
+
+dat_c1b <- filter(dat,
+                  SEASON == 2020, 
+                  NAME != "NOT_NAMED")
+
+hurricanes_2020 <- distinct(filter(dat_c1b, WMO_WIND %in% c(64:96)), SID)
+major_hurricanes <- filter(dat_c1b, WMO_WIND >= 96, SID %in% hurricanes_2020$SID)
+major_hurricanes_count <- count(distinct(major_hurricanes, SID))
+major_hurricanes_count
+  
+category_5 <- count(distinct(filter(dat, WMO_WIND >= 137, SID %in% major_hurricanes$SID), SID))
+category_5
+
+
+#I divided the claim into 2 parts: 1) 7 of the 2020 named hurricanes became major hurricanes; and 2) 0 of the major hurricanes is in Category 5 in or after 2020. 
+
+#For 1), I checked if the number of the 2020 named hurricanes that became major hurricanes was 7. I used filter() on dat to get named hurricanes (of which should exclude those with NAME as "NOT_NAMED") in 2020, getting filtered  dat_c1b. I then used filter() on dat_c1b to get hurricanes (WMO_WIND >= 64 knots, but <= 96 knots before intensifying to major hurricanes), and used distinct() on SID, getting hurricanes_2020. I used filter() on dat_c1b again to get major hurricanes (WMO_WIND >= 96 knots) with the same SID in hurricanes_2020, which means the major hurricanes that turned from hurricanes in 2020, as major_hurricanes. I used distinct() again on SID to avoid re-counting the same storms or miscounting different storms with same names, and count() to count the number of different major hurricanes. In the first output  major_hurricanes_count, the value in column n is 7, so 7 of the named hurricanes in 2020 became major hurricanes in or after 2020, so the first part of the claim is true.
+
+#For 2), I checked if the number of the 7 major hurricanes that reaches Category 5 in was 0. I used filter() on dat to get Category 5 storms (of which maximum sustained wind speed is greater than or equal to 137 knots as defined for Category 5) that share SID with the storms in major_hurricanes, and thus are the same major hurricanes that turned from hurricanes in 2020. I then used distinct() on SID  to avoid re-counting the same storms or miscounting different storms with same names. I finally used count() to get the number of major hurricanes that reached Category 5. In the second  output category_5, the value in column n is 0, indicating 0 of the major hurricanes that turned from hurricanes in 2020 reached Category 5 status, so the second part of the claim is true. Therefore, claim C1.b) is true. 
+
+```
+
+
+
+```{r}
+#C1.c)
+
+dat_c1c <- filter(dat, 
+                  SEASON == 2010, 
+                  NAME != "NOT_NAMED"
+                  )
+
+named_2010 <- count(distinct(dat_c1c, SID))
+named_2010
+
+hit_us <- count(distinct(filter(dat_c1c, 
+                                WMO_WIND >= 64, 
+                                LAT %in% c(18.9167:71.3833), 
+                                LON %in% c(124.7333:172.45)
+                               ), 
+                         SID)
+                )
+hit_us
+
+
+#I divided the claim into 2 parts: 1) There are 19 named storms in 2010; and 2) 0 of the hurricanes hit the US. 
+
+#For 1), I checked if the number of the 2010 named storms was 19. I used filter() on dat to get named hurricanes (of which should exclude those with NAME as "NOT_NAMED") in 2010, getting dat_c1c. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names, and count() to count the number of different storms. In the first output  named_2010, the value in column n is 19. Thus, 2010 has 19 named storms, and the first part of the claim is true.
+
+#For 2), I checked if the number of hurricanes that hit the US in 2010 was 0. I used filter() on dat_c1c to get hurricanes (of which maximum sustained wind speed is greater than or equal to 64 knots as defined for hurricanes) in the US (latitude between 18.9167 degrees and 71.3833 degrees, and longitude between 124.7333 degrees and 172.45 degrees) in 2010. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names. At last, I used count() to get the number of hurricanes that hit the US. In the second  output hit_us, the value in column n is 0. This indicated that 0 hurricanes in 2010 hit the US, so the second part of the claim is true. Therefore, claim C1.c) is true. 
+
+```
+
+
+```{r}
+#C1.d)
+
+dat_c1d <- filter(dat, 
+                  SEASON == 2005, 
+                  NAME != "NOT_NAMED"
+                  )
+
+named_2005 <- count(distinct(dat_c1d, SID))
+named_2005
+
+major_hurricanes_2005 <- count(distinct(filter(dat_c1d, WMO_WIND >= 96), SID))
+major_hurricanes_2005
+
+most_major_hurricanes <- arrange(count(distinct(filter(dat, SEASON %in% c(1970:2020), WMO_WIND >= 96), SID, SEASON), SEASON), desc(n))
+most_major_hurricanes
+
+
+#I divided the claim into 3 parts: 1) There are 27 named storms in 2005; 2) There are 7 major hurricanes in 2005; and 3) 2005 has the most major hurricanes among 1970-2020. 
+
+#For 1), I checked if the number of the 2005 named storms was 27. I used filter() on dat to get named storms (of which should exclude those with NAME as "NOT_NAMED") in 2005, getting dat_c1d. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names, and count() to count the number of different storms. In the first output  named_2005, the value in column n is 27, which means the 2005 Atlantic hurricane season featured 27 named storms. Thus, the first part of the claim is true.
+
+#For 2), I checked if the number of major hurricanes in 2005 was 7. I used filter() on dat_c1d to get major hurricanes (of which maximum sustained wind speed is greater than or equal to 96 knots as defined for hurricanes) in 2005. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names. At last, I used count() to get the number of major hurricanes. In the second  output major_hurricanes_2005, the value in column n is 7. This indicated that 7 of the 27 named storms became major hurricanes in 2005, so the second part of the claim is true.  
+
+#For 3), I checked if the number of major hurricanes in 2005 was higher than any other season between 1970 and 2020. I used filter() on dat to get major hurricanes (of which maximum sustained wind speed is greater than or equal to 96 knots as defined for hurricanes) during 1970-2020. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names, while using distinct() on SEASON so that I used count() to divide the major hurricanes based on SEASON and compare the numbers of different seasons. Finally, I used arrange(desc(n)) to sort SEASON in decreasing order of n, the number of major hurricanes. In the third  output most_major_hurricanes, the first two values in column are the same, 7. In other words, not only 2005 but also 2020 have the most number of major hurricanes of 7, so the third part of the claim is not completely true. Therefore, claim C1.d) is half-true.
+
+```
+
+
+```{r}
+#C1.e)
+
+dat_c1e <- filter(dat, 
+                  SEASON %in% c(1970:2020)
+                  )
+
+most_active <- arrange(count(distinct(dat_c1e, SID, SEASON), SEASON), desc(n))
+most_active
+
+
+#I checked if the number of storms in 2020 was higher than any other season between 1970 and 2020. I used filter() on dat to get storms during 1970-2020, getting  dat_c1e. I then used distinct() on SID to avoid re-counting the same storms or miscounting different storms with same names, while using distinct() on SEASON so that I used count() to divide the storms based on SEASON and compare the numbers of different seasons. I lastly used arrange(desc(n)) to sort SEASON in decreasing order of n, the number of storms. In the  output most_active, the first two values in column are the same, 31. In other words, not only 2020 but also 2005 have the most number of storms of 31 in the period from 1970 to 2020. Thus, claim C1.e) is half-true.
+
+```
+
+
+```{r}
+#C1.f)
+
+dat_c1f <- filter(dat, SEASON == 2020) 
+
+hurricanes_2020 <- count(distinct(filter(dat_c1f, WMO_WIND >= 64), SID))
+hurricanes_2020
+
+most_hurricanes <- arrange(count(distinct(filter(dat, SEASON %in% c(1970:2020), WMO_WIND >= 64), SID, SEASON), SEASON), desc(n))
+most_hurricanes
+
+
+#I divided the claim into 2 parts: 1) 14 storms became hurricanes in 2020; and 2) The number of hurricanes in 2020 was higher than any other season between 1970 and 2020.
+
+#For 1), I checked if the number of the 2020 hurricanes was 14. I used filter() on dat to get storms in 2020, getting dat_c1f. I then used filter() again on dat_c1f to get hurricanes (WMO_WIND >= 64 knots). I used distinct() and count() for the number of different hurricanes. In the first output hurricanes_2020, the value in column n is 14, indicating 14 storms intensified into hurricanes in 2020, so the first part of the claim is true.
+
+#For 2), I checked if the number of hurricanes that hit the US in 2010 was 0. I used filter() on dat to get hurricanes (WMO_WIND >= 64 knots) between 1970 and 2010. I then used distinct() and count() to compare the numbers of storms in different seasons. I lastly used arrange(desc(n)) to sort SEASON in decreasing order of n, the number of storms. In the second output most_hurricanes, in the first row the corresponding value (15) of the column n (which means number) to the value 2005 in the column SEASON, while 2020 is in the second row of the SEASON column, corresponding to the value 14 in the column n. This means 2005 has 15 hurricanes which is more than 14 in 2020, so 2020 is not the season with the most number of hurricanes during the period 1970 to 2020 and the second part of the claim is false. As a result, claim C1.f) is false.
+
+```
+
+
+
+
+```{r}
+#C.2)
+
+dat_c2 <- filter(dat, SEASON == 2020)
+map <- map_data("world")
+
+ggplot(dat_c2, aes(x = LON, y = LAT, colour = NAME, size = NATURE)) +
+  geom_point(alpha = 0.5) +
+  geom_polygon(data = map, 
+               aes(x = long, 
+                   y = lat, 
+                   group = group), 
+               fill = "gray95", 
+               colour = "gray70", 
+               size = 0.2) +
+  scale_x_continuous(limits = c(-200, 50))+
+  scale_y_continuous(limits = c(0, 80)) +
+  labs(title = "Animated Map of Storms in 2020",
+       subtitle = 'Month: {as.integer(frame_time)}',
+       x = "Longitude", 
+       y = "Latitute") +
+  transition_time(MONTH) + 
+  shadow_wake(wake_length = 0.5, alpha = FALSE) +
+  ease_aes('linear', interval = 0.001) +
+  theme_bw()
+
+#I wanted to show the display the paths of different storms in each month in 2020 on my animated map. I used filter() on dat to get storms in 2020, getting dat_c2, and used map_data() to input the world map as map. I used ggplot() to first make a static plot of the storms in dat_c2, using longitude as the x-axis and  latitude as the y-axis, coloring according to NAME and sizing according to NATURE of storms in order to tell what type of storm is happening. I used geom_point() to make the plots a little bit transparent by setting alpha to 0.5 so that they don't completely cover the map but can still be seen, and I set show.legend as TRUE so that the NATURE, or storm types, are clarified next to the plot. I used geom_polygon to input the world map, using longitude as the x-axis, latitude as the y-axis, and group = group to ensure that shapes and boundaries of the map are connected correctly on the graph. I also set the fill, colour, and size of the polygon for more appropriate views. I used scale_x_continuous() and scale_y_continuous() to re-scale the map so that only Atlantic areas where all storms took place in are shown. I re-labeled the x-axis "LON" with "Longitude" and the y-axis "LAT" as "Latitude," and added a title as "Animated Map of Storms in 2020" and a subtitle to display the Months as integers so that the graph is more explicit. Then, I used transition_states() to animate the static plot. I set transition_length to 2 and state_length to 1 for better looks. I used transition_time() to make the plots move as time goes by in 2020. I used shadow_wake() to leave disappearing traces so that the movements and trajectories are clearer to people. I used ease_aes() to make the changes linearly and not too fast at an interval of 0.001. Finally, I chose a theme of black and white for a succinct look. From the map output, I observed that most various storms happened in September, probably because wind shear reaches a minimum and thus not preventing tropical cyclone formation, and because warmer water contributes to higher storm activity.
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
